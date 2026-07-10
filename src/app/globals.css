@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -120,3 +119,51 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ============================================
+   ANIMASI MANUAL (pengganti tw-animate-css)
+   ============================================ */
+
+@keyframes enter {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes exit {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-4px) scale(0.98); }
+}
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+@keyframes slide-in-from-top { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+@keyframes slide-in-from-bottom { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes slide-in-from-left { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes slide-in-from-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+@keyframes zoom-in { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes zoom-out { from { transform: scale(1); opacity: 1; } to { transform: scale(0.95); opacity: 0; } }
+
+.animate-in { animation: enter 0.2s ease-out; }
+.animate-out { animation: exit 0.15s ease-in; }
+.fade-in { animation: fade-in 0.2s ease-out; }
+.fade-out { animation: fade-out 0.15s ease-in; }
+.zoom-in { animation: zoom-in 0.2s ease-out; }
+.zoom-out { animation: zoom-out 0.15s ease-in; }
+.slide-in-from-top { animation: slide-in-from-top 0.2s ease-out; }
+.slide-in-from-bottom { animation: slide-in-from-bottom 0.2s ease-out; }
+.slide-in-from-left { animation: slide-in-from-left 0.2s ease-out; }
+.slide-in-from-right { animation: slide-in-from-right 0.2s ease-out; }
+
+[data-state="open"] { animation: enter 0.2s ease-out; }
+[data-state="closed"] { animation: exit 0.15s ease-in; }
+
+button, a, [role="button"] { transition: all 0.15s ease; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: oklch(0.9 0 0); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: oklch(0.8 0 0); }
+.dark ::-webkit-scrollbar-thumb { background: oklch(0.3 0 0); }
+.dark ::-webkit-scrollbar-thumb:hover { background: oklch(0.4 0 0); }
