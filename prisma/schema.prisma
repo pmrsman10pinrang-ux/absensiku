@@ -1,5 +1,6 @@
 // SIAS-SIS — Sistem Informasi Absensi Siswa
-// Schema dirancang agar mudah dimigrasikan ke Supabase (PostgreSQL)
+// Schema ini pakai @map untuk mapping camelCase (Prisma) → snake_case (PostgreSQL)
+// Kompatibel dengan supabase-schema.sql (lowercase tables, snake_case columns)
 
 generator client {
   provider = "prisma-client-js"
@@ -14,14 +15,14 @@ datasource db {
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
-  passwordHash String
+  passwordHash String   @map("password_hash")
   name         String
   role         Role
   phone        String?
-  avatarUrl    String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  avatarUrl    String?  @map("avatar_url")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt      @map("updated_at")
 
   teacher      Teacher?
   student      Student?
@@ -32,6 +33,8 @@ model User {
   violationsHandled  Violation[] @relation("ViolationHandler")
   notifications Notification[]
   sessions     Session[]
+
+  @@map("users")
 }
 
 enum Role {
@@ -49,69 +52,77 @@ model School {
   address       String
   latitude      Float
   longitude     Float
-  radiusMeters  Int      @default(150)
-  checkInStart  String   @default("06:30")
-  checkInEnd    String   @default("07:30")
-  lateThreshold String   @default("07:15")
-  academicYear  String
+  radiusMeters  Int      @default(150) @map("radius_meters")
+  checkInStart  String   @default("06:30") @map("check_in_start")
+  checkInEnd    String   @default("07:30") @map("check_in_end")
+  lateThreshold String   @default("07:15") @map("late_threshold")
+  academicYear  String   @map("academic_year")
   semester      String   @default("GANJIL")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt      @map("updated_at")
+
+  @@map("schools")
 }
 
 // ===================== CLASS =====================
 model Class {
   id         String   @id @default(cuid())
-  name       String   @unique // e.g. "X IPA 1"
-  level      String   // "X", "XI", "XII"
+  name       String   @unique
+  level      String
   major      String   @default("-")
-  waliKelasId String? @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  waliKelasId String? @unique @map("wali_kelas_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt      @map("updated_at")
 
   waliKelas  User?    @relation("ClassWaliKelas", fields: [waliKelasId], references: [id])
   students   Student[]
   subjects   Subject[]
   attendances Attendance[]
+
+  @@map("classes")
 }
 
 // ===================== TEACHER =====================
 model Teacher {
   id        String   @id @default(cuid())
-  userId    String   @unique
+  userId    String   @unique @map("user_id")
   nip       String   @unique
   gender    String   @default("L")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   subjects  Subject[]
+
+  @@map("teachers")
 }
 
 // ===================== STUDENT =====================
 model Student {
   id          String   @id @default(cuid())
-  userId      String   @unique
+  userId      String   @unique @map("user_id")
   nis         String   @unique
   nisn        String?
   gender      String   @default("L")
-  birthPlace  String?
-  birthDate   DateTime?
+  birthPlace  String?  @map("birth_place")
+  birthDate   DateTime? @map("birth_date")
   address     String?
-  parentId    String?
-  parentName  String?
-  parentPhone String?
-  classId     String
-  photoUrl    String?  // untuk verifikasi wajah
-  faceDescriptor String? // JSON string face embedding (untuk face-api.js)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  parentId    String?  @map("parent_id")
+  parentName  String?  @map("parent_name")
+  parentPhone String?  @map("parent_phone")
+  classId     String   @map("class_id")
+  photoUrl    String?  @map("photo_url")
+  faceDescriptor String? @map("face_descriptor")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
 
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   class       Class    @relation(fields: [classId], references: [id])
   attendances Attendance[]
   grades      Grade[]
   violations  Violation[]
+
+  @@map("students")
 }
 
 // ===================== SUBJECT =====================
@@ -119,43 +130,46 @@ model Subject {
   id         String   @id @default(cuid())
   name       String
   code       String   @unique
-  teacherId  String?
-  classId    String
-  kkm        Float    @default(75) // kriteria ketuntasan minimal
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  teacherId  String?  @map("teacher_id")
+  classId    String   @map("class_id")
+  kkm        Float    @default(75)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt      @map("updated_at")
 
   teacher    Teacher? @relation(fields: [teacherId], references: [id])
   class      Class    @relation(fields: [classId], references: [id])
   grades     Grade[]
+
+  @@map("subjects")
 }
 
 // ===================== ATTENDANCE =====================
 model Attendance {
   id            String   @id @default(cuid())
-  studentId     String
-  classId       String
+  studentId     String   @map("student_id")
+  classId       String   @map("class_id")
   date          DateTime
   status        AttendanceStatus
-  checkInTime   DateTime?
-  checkOutTime  DateTime?
-  faceVerified  Boolean  @default(false)
-  faceConfidence Float  @default(0)
-  locationLat   Float?
-  locationLng   Float?
-  locationValid Boolean  @default(false)
-  distanceMeters Float?
+  checkInTime   DateTime? @map("check_in_time")
+  checkOutTime  DateTime? @map("check_out_time")
+  faceVerified  Boolean  @default(false) @map("face_verified")
+  faceConfidence Float   @default(0)     @map("face_confidence")
+  locationLat   Float?   @map("location_lat")
+  locationLng   Float?   @map("location_lng")
+  locationValid Boolean  @default(false) @map("location_valid")
+  distanceMeters Float?  @map("distance_meters")
   note          String?
-  reportedById  String?
-  method        String   @default("FACE_SCAN") // FACE_SCAN | MANUAL | PIKET
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  reportedById  String?  @map("reported_by_id")
+  method        String   @default("FACE_SCAN")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt      @map("updated_at")
 
   student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   class         Class    @relation(fields: [classId], references: [id])
   reportedBy    User?    @relation("AttendanceReporter", fields: [reportedById], references: [id])
 
   @@unique([studentId, date])
+  @@map("attendances")
 }
 
 enum AttendanceStatus {
@@ -169,38 +183,40 @@ enum AttendanceStatus {
 // ===================== GRADE =====================
 model Grade {
   id         String   @id @default(cuid())
-  studentId  String
-  subjectId  String
-  teacherId  String?
+  studentId  String   @map("student_id")
+  subjectId  String   @map("subject_id")
+  teacherId  String?  @map("teacher_id")
   score      Float
-  type       String   // TUGAS | UTS | UAS | HARIAN | QUIZ
+  type       String
   date       DateTime
   note       String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt      @map("updated_at")
 
   student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   subject    Subject  @relation(fields: [subjectId], references: [id])
   teacher    User?    @relation("GradeTeacher", fields: [teacherId], references: [id])
+
+  @@map("grades")
 }
 
 // ===================== VIOLATION =====================
 model Violation {
   id           String   @id @default(cuid())
-  studentId    String
-  violationTypeId String
+  studentId    String   @map("student_id")
+  violationTypeId String @map("violation_type_id")
   level        ViolationLevel
   points       Int
   description  String
   location     String?
   date         DateTime
   status       ViolationStatus @default(DILAPORKAN)
-  reportedById String?
-  handledById  String?
-  handlerNote  String?
-  followUp     String? // TINDAKAN | KONSELING | PANGGILAN ORTU | SELESAI
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  reportedById String?  @map("reported_by_id")
+  handledById  String?  @map("handled_by_id")
+  handlerNote  String?  @map("handler_note")
+  followUp     String?  @map("follow_up")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt      @map("updated_at")
 
   student       Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
   violationType ViolationType @relation(fields: [violationTypeId], references: [id])
@@ -209,6 +225,7 @@ model Violation {
 
   @@index([studentId, date])
   @@index([status])
+  @@map("violations")
 }
 
 enum ViolationLevel {
@@ -228,39 +245,44 @@ enum ViolationStatus {
 model ViolationType {
   id          String   @id @default(cuid())
   name        String   @unique
-  category    String   // AKHLAK | DISIPLIN | KERAPIAN | LAINNYA
+  category    String
   level       ViolationLevel @default(RINGAN)
-  defaultPoints Int
+  defaultPoints Int     @map("default_points")
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
 
   violations  Violation[]
+
+  @@map("violation_types")
 }
 
 // ===================== NOTIFICATION =====================
 model Notification {
   id        String   @id @default(cuid())
-  userId    String
+  userId    String   @map("user_id")
   title     String
   body      String
-  type      String   // VIOLATION | ATTENDANCE | GRADE | SYSTEM
-  refId     String?
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
+  type      String
+  refId     String?  @map("ref_id")
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead])
+  @@map("notifications")
 }
 
 // ===================== SESSION (custom) =====================
 model Session {
   id        String   @id @default(cuid())
-  userId    String
+  userId    String   @map("user_id")
   token     String   @unique
   expires   DateTime
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
 }
