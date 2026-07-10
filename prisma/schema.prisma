@@ -1,0 +1,266 @@
+// SIAS-SIS — Sistem Informasi Absensi Siswa
+// Schema dirancang agar mudah dimigrasikan ke Supabase (PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ===================== USER & AUTH =====================
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role
+  phone        String?
+  avatarUrl    String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  teacher      Teacher?
+  student      Student?
+  classesAsWali Class[] @relation("ClassWaliKelas")
+  attendances  Attendance[]   @relation("AttendanceReporter")
+  gradesGiven  Grade[]        @relation("GradeTeacher")
+  violationsReported Violation[] @relation("ViolationReporter")
+  violationsHandled  Violation[] @relation("ViolationHandler")
+  notifications Notification[]
+  sessions     Session[]
+}
+
+enum Role {
+  ADMIN
+  WALI_KELAS
+  SISWA
+  GURU_BK
+  PIKET
+}
+
+// ===================== SCHOOL CONFIG =====================
+model School {
+  id            String   @id @default(cuid())
+  name          String
+  address       String
+  latitude      Float
+  longitude     Float
+  radiusMeters  Int      @default(150)
+  checkInStart  String   @default("06:30")
+  checkInEnd    String   @default("07:30")
+  lateThreshold String   @default("07:15")
+  academicYear  String
+  semester      String   @default("GANJIL")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ===================== CLASS =====================
+model Class {
+  id         String   @id @default(cuid())
+  name       String   @unique // e.g. "X IPA 1"
+  level      String   // "X", "XI", "XII"
+  major      String   @default("-")
+  waliKelasId String? @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  waliKelas  User?    @relation("ClassWaliKelas", fields: [waliKelasId], references: [id])
+  students   Student[]
+  subjects   Subject[]
+  attendances Attendance[]
+}
+
+// ===================== TEACHER =====================
+model Teacher {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  nip       String   @unique
+  gender    String   @default("L")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjects  Subject[]
+}
+
+// ===================== STUDENT =====================
+model Student {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  nis         String   @unique
+  nisn        String?
+  gender      String   @default("L")
+  birthPlace  String?
+  birthDate   DateTime?
+  address     String?
+  parentId    String?
+  parentName  String?
+  parentPhone String?
+  classId     String
+  photoUrl    String?  // untuk verifikasi wajah
+  faceDescriptor String? // JSON string face embedding (untuk face-api.js)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  class       Class    @relation(fields: [classId], references: [id])
+  attendances Attendance[]
+  grades      Grade[]
+  violations  Violation[]
+}
+
+// ===================== SUBJECT =====================
+model Subject {
+  id         String   @id @default(cuid())
+  name       String
+  code       String   @unique
+  teacherId  String?
+  classId    String
+  kkm        Float    @default(75) // kriteria ketuntasan minimal
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  teacher    Teacher? @relation(fields: [teacherId], references: [id])
+  class      Class    @relation(fields: [classId], references: [id])
+  grades     Grade[]
+}
+
+// ===================== ATTENDANCE =====================
+model Attendance {
+  id            String   @id @default(cuid())
+  studentId     String
+  classId       String
+  date          DateTime
+  status        AttendanceStatus
+  checkInTime   DateTime?
+  checkOutTime  DateTime?
+  faceVerified  Boolean  @default(false)
+  faceConfidence Float  @default(0)
+  locationLat   Float?
+  locationLng   Float?
+  locationValid Boolean  @default(false)
+  distanceMeters Float?
+  note          String?
+  reportedById  String?
+  method        String   @default("FACE_SCAN") // FACE_SCAN | MANUAL | PIKET
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class         Class    @relation(fields: [classId], references: [id])
+  reportedBy    User?    @relation("AttendanceReporter", fields: [reportedById], references: [id])
+
+  @@unique([studentId, date])
+}
+
+enum AttendanceStatus {
+  HADIR
+  TERLAMBAT
+  IZIN
+  SAKIT
+  ALPA
+}
+
+// ===================== GRADE =====================
+model Grade {
+  id         String   @id @default(cuid())
+  studentId  String
+  subjectId  String
+  teacherId  String?
+  score      Float
+  type       String   // TUGAS | UTS | UAS | HARIAN | QUIZ
+  date       DateTime
+  note       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject    Subject  @relation(fields: [subjectId], references: [id])
+  teacher    User?    @relation("GradeTeacher", fields: [teacherId], references: [id])
+}
+
+// ===================== VIOLATION =====================
+model Violation {
+  id           String   @id @default(cuid())
+  studentId    String
+  violationTypeId String
+  level        ViolationLevel
+  points       Int
+  description  String
+  location     String?
+  date         DateTime
+  status       ViolationStatus @default(DILAPORKAN)
+  reportedById String?
+  handledById  String?
+  handlerNote  String?
+  followUp     String? // TINDAKAN | KONSELING | PANGGILAN ORTU | SELESAI
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  student       Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  violationType ViolationType @relation(fields: [violationTypeId], references: [id])
+  reportedBy    User?         @relation("ViolationReporter", fields: [reportedById], references: [id])
+  handledBy     User?         @relation("ViolationHandler", fields: [handledById], references: [id])
+
+  @@index([studentId, date])
+  @@index([status])
+}
+
+enum ViolationLevel {
+  RINGAN
+  SEDANG
+  BERAT
+}
+
+enum ViolationStatus {
+  DILAPORKAN
+  DIPROSES
+  KONSELING
+  SELESAI
+  DITOLAK
+}
+
+model ViolationType {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  category    String   // AKHLAK | DISIPLIN | KERAPIAN | LAINNYA
+  level       ViolationLevel @default(RINGAN)
+  defaultPoints Int
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  violations  Violation[]
+}
+
+// ===================== NOTIFICATION =====================
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  type      String   // VIOLATION | ATTENDANCE | GRADE | SYSTEM
+  refId     String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
+
+// ===================== SESSION (custom) =====================
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
